@@ -55,7 +55,7 @@ Contributions to the Library Management System project are welcome! If you have 
 
 ## License
 
-The Library Management System project is licensed under the [MIT License](LICENSE).
+The Library Management System project is licensed under the [CC0-1.0](LICENSE).
 
 Feel free to modify and use the project according to your needs.
 
