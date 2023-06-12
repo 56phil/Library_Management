@@ -287,6 +287,8 @@ void displayHelp(WINDOW *oWin) {
   std::string h1("Help Screen");
   displayTextAtCenter(oWin, h1, 1);
   displayMenu(oWin);
+  std::string h0("Choose one of the availible options from the above list. "
+                 "e.g. 'c' will display the catalog of books.");
 }
 
 /*
