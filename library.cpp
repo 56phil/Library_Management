@@ -1,10 +1,5 @@
 // library.cpp
 #include "library.hpp"
-#include "book.hpp"
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <vector>
 
 bool Library::empty() { return this->books.empty(); }
 

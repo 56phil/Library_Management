@@ -23,7 +23,7 @@ To run the Library Management System, follow these steps:
 3. Compile the source code files using the C++ compiler. For example:
 
    ```shell
-   g++ main.cpp book.cpp library.cpp -o lms -lboost_serialization -lncurses 
+   g++ main.cpp book.cpp library.cpp -o lms -lboost_serialization -lncurses -std=c++17
    ```
 
 4. Run the compiled executable:

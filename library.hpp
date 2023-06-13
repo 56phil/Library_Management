@@ -4,10 +4,13 @@
 #define LIBRARY_HPP
 
 #include "book.hpp"
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
+ 
 typedef std::unordered_map<std::string, Book> umb;
 typedef unsigned long ul;
 

@@ -99,6 +99,12 @@ void searchUsingTitle(WINDOW *, WINDOW *, Library &);
 void tag(WINDOW *, std::string);
 void tuiLoop(WINDOW *, WINDOW *, Library &);
 
+/* main
+   gets: usual cli parameters which are ignored
+   returns: int 0
+   set curses with two windows, loads library data, enters tui looop, stores
+   library, terminates curses, and clears the screen.
+ */
 int main(int argc, char *argv[]) {
   initscr();
   refresh();
@@ -107,15 +113,14 @@ int main(int argc, char *argv[]) {
   int screenWidth, screenHeight;
   getmaxyx(stdscr, screenHeight, screenWidth);
 
-  // mvprintw(1, 5, "w: %d  h: %d", screenWidth, screenHeight);
-  // refresh();
-
-  const int IWIN_HEIGHT(4);
+  const int IWIN_HEIGHT(4); // input window height
   WINDOW *iWin(newwin(IWIN_HEIGHT, screenWidth, screenHeight - IWIN_HEIGHT, 0));
-  wrefresh(iWin);
 
   WINDOW *oWin(newwin(screenHeight - IWIN_HEIGHT, screenWidth, 0, 0));
   displayWelcome(oWin);
+
+  refresh();
+  wrefresh(iWin);
   wrefresh(oWin);
 
   Library dLibrary;
@@ -131,43 +136,39 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
+/* tuiLoop
+
+ */
 void tuiLoop(WINDOW *iWin, WINDOW *oWin, Library &dLibrary) {
-  bool firstTime(true);
+  displayWelcome(oWin);
   char ch(' ');
   do {
-    if (firstTime) {
-      firstTime = false;
-      displayWelcome(oWin);
-    } else {
-      cbreak();
-      werase(iWin);
-      // mvwprintw(iWin, 1, 3, ": ");
-      wrefresh(iWin);
-      wrefresh(oWin);
-      curs_set(1);
-      ch = getch();
-      curs_set(0);
-      wrefresh(iWin);
-      if (ch != ERR) {
-        if (ch == 'a') {
-          addBookToLibrary(iWin, oWin, dLibrary);
-        } else if (ch == 'g') {
-          displayWelcome(oWin);
-        } else if (ch == 'c') {
-          displayCatalog(oWin, dLibrary);
-        } else if (ch == 'r') {
-          removeBookFromLibrary(iWin, oWin, dLibrary);
-        } else if (ch == 't') {
-          searchUsingTitle(iWin, oWin, dLibrary);
-        } else if (ch == 's') {
-          searchUsingAuthor(iWin, oWin, dLibrary);
-        } else if (ch == 'x') {
-          break;
-        } else if (ch == 'h') {
-          displayHelp(oWin);
-        } else {
-          displayHelp(oWin);
-        }
+    // cbreak();
+    werase(iWin);
+    wrefresh(iWin);
+    wrefresh(oWin);
+    curs_set(0);
+    move(0, 0);
+    ch = getch();
+    curs_set(0);
+    wrefresh(iWin);
+    if (ch != ERR) {
+      if (ch == 'a') {
+        addBookToLibrary(iWin, oWin, dLibrary);
+      } else if (ch == 'c') {
+        displayCatalog(oWin, dLibrary);
+      } else if (ch == 'r') {
+        removeBookFromLibrary(iWin, oWin, dLibrary);
+      } else if (ch == 't') {
+        searchUsingTitle(iWin, oWin, dLibrary);
+      } else if (ch == 's') {
+        searchUsingAuthor(iWin, oWin, dLibrary);
+      } else if (ch == 'x') {
+        break;
+      } else if (ch == 'h') {
+        displayHelp(oWin);
+      } else {
+        displayHelp(oWin);
       }
     }
   } while (true);
@@ -180,9 +181,6 @@ void addBookToLibrary(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
   werase(oWin);
   displayBook(oWin, aBook, lastRowInWin(oWin));
   tag(oWin, "ADDED");
-  wrefresh(oWin);
-  curs_set(0);
-  move(0, 0);
 }
 
 void removeBookFromLibrary(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
@@ -196,9 +194,6 @@ void removeBookFromLibrary(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
   } else {
     tag(oWin, "NOT FOUND");
   }
-  wrefresh(oWin);
-  curs_set(0);
-  move(0, 0);
 }
 
 void searchUsingTitle(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
@@ -237,12 +232,9 @@ void searchUsingAuthor(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
     displayTextAtCenter(oWin, s0, 1);
     displyBookVector(oWin, results);
   }
-  wrefresh(oWin);
-  curs_set(0);
-  move(0, 0);
 }
 
-void buildTitle(WINDOW *iWin, Book &aBook, char buff[256]) {
+void buildTitle(WINDOW *iWin, Book &aBook, char buff[512]) {
   werase(iWin);
   mvwprintw(iWin, 1, 3, "title: ");
   wrefresh(iWin);
@@ -253,7 +245,7 @@ void buildTitle(WINDOW *iWin, Book &aBook, char buff[256]) {
   wrefresh(iWin);
 }
 
-void buildAuthor(WINDOW *iWin, Book &aBook, char buff[256]) {
+void buildAuthor(WINDOW *iWin, Book &aBook, char buff[512]) {
   werase(iWin);
   mvwprintw(iWin, 1, 2, "author: ");
   wrefresh(iWin);
@@ -264,7 +256,7 @@ void buildAuthor(WINDOW *iWin, Book &aBook, char buff[256]) {
   wrefresh(iWin);
 }
 
-void buildISBN(WINDOW *iWin, Book &aBook, char buff[256]) {
+void buildISBN(WINDOW *iWin, Book &aBook, char buff[512]) {
   werase(iWin);
   mvwprintw(iWin, 1, 4, "ISBN: ");
   wrefresh(iWin);
@@ -360,6 +352,11 @@ void displayWelcome(WINDOW *aWin) {
   displayMenu(aWin);
 }
 
+/* displayMenu
+   gets: WINDOW pointer
+   returns: nothing
+   objective: display options - used by displayHelp & displayWelcome
+ */
 void displayMenu(WINDOW *aWin) {
   std::string m0("MENU");
   std::string m1("H: Help");
@@ -378,17 +375,24 @@ void displayMenu(WINDOW *aWin) {
   for (auto s : menuDetail) {
     mvwprintw(aWin, r++, c, s.c_str());
   }
-  wrefresh(aWin);
-  curs_set(0);
-  move(0, 0);
 }
 
+/* lastRowInWin
+   gets: WINDOW pointer
+   returns: int
+   objective: return the number of last useable row
+ */
 int lastRowInWin(WINDOW *aWin) {
   int maxRows, maxCols;
   getmaxyx(aWin, maxRows, maxCols);
   return maxRows - 1;
 }
 
+/* maxSizeInVector
+   gets: vector of strings
+   returns: int
+   objective: return the length of longest string in vector
+ */
 int maxSizeInVector(std::vector<std::string> sv) {
   int sz(0);
   for (auto s : sv) {
@@ -397,22 +401,43 @@ int maxSizeInVector(std::vector<std::string> sv) {
   return sz;
 }
 
+/* lastColForThis
+   gets: WINDOW pointer, string
+   returns: int
+   objective: return the starting position of given string so that right
+   justified
+ */
 int lastColForThis(WINDOW *aWin, std::string str) {
   int maxRows, maxCols;
   getmaxyx(aWin, maxRows, maxCols);
   return maxCols - str.size();
 }
 
+/* tag
+   gets: WINDOW pointer, string
+   returns: nothing
+   objective: put the string on the far right side of the bottom row.
+ */
 void tag(WINDOW *aWin, std::string str) {
   mvwprintw(aWin, lastRowInWin(aWin), lastColForThis(aWin, str), str.c_str());
 }
 
+/* displyBookVector
+   gets: WINDOW pointer
+   vector of Book objects
+   returns: nothing
+   objective: put the contents of books on the screen
+   method: locates the center, displays the header, traverses the vector
+   displaying title, author, and ISBN using the displayBook function.
+*/
 void displyBookVector(WINDOW *aWin, vBook &books) {
   int maxRows, maxCols, r(3);
   Book aBook;
   getmaxyx(aWin, maxRows, maxCols);
-  int cen(maxCols >> 1);
+  int cen((maxCols >> 1) - 6);
   int lef(cen - 33), rig(cen + 49);
+  lef = lef < 0 ? 0 : lef;
+  rig = rig + 11 > maxCols ? maxCols - 11 : rig;
   aBook.clear();
   aBook.setAuthor("Author");
   aBook.setTitle("Title");
@@ -421,7 +446,4 @@ void displyBookVector(WINDOW *aWin, vBook &books) {
   for (auto aBook : books) {
     displayBook(aWin, aBook, r++, lef, cen, rig);
   }
-  wrefresh(aWin);
-  curs_set(0);
-  move(0, 0);
 }
