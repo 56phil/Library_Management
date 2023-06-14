@@ -2,13 +2,7 @@
 #ifndef BOOK_HPP
 #define BOOK_HPP
 
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/serialization/string.hpp>
-#include <boost/serialization/unordered_map.hpp>
-#include <iomanip>
-#include <sstream>
-#include <string>
+#include "lms_project.hpp"
 
 class Book {
 public:
@@ -49,6 +43,7 @@ private:
   std::string author;
   std::string isbn;
 };
+typedef std::vector<Book> vBook;
 
 namespace std {
 template <> struct hash<Book> {

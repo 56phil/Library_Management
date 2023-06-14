@@ -1,5 +1,7 @@
 // library.cpp
+
 #include "library.hpp"
+#include "lms_project.hpp"
 
 bool Library::empty() { return this->books.empty(); }
 
@@ -34,14 +36,15 @@ void Library::searchByAuthor(std::string &author, std::vector<Book> &results) {
     }
   }
 }
-void Library::searchByISPN(std::string &ispn, std::vector<Book> &results) {
+
+void Library::searchByISBN(std::string &isbn, std::vector<Book> &results) {
   results.clear();
-  for (auto aPair : books) {
-    if (aPair.second.getISBN() == ispn) {
-      results.emplace_back(aPair.second);
-      break;
-    }
+  auto it =
+      books.find(isbn); // Find the element in the unordered_map
+  if (it != books.end()) {
+    results.emplace_back(it->second); 
   }
+
 }
 
 void Library::searchByTitle(std::string &title, std::vector<Book> &results) {
