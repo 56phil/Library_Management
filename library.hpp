@@ -5,8 +5,6 @@
 
 #include "book.hpp"
  
-typedef std::unordered_map<std::string, Book> umB;
-typedef unsigned long ul;
 
 class Library {
 public:

@@ -56,15 +56,21 @@ instructions on how to run your program.
 
 #include "book.hpp"
 #include "library.hpp"
-class Book;     //forward declaration 
-class Library;  //forward declaration
+#include <cstdio>
+#include <ncurses.h>
+#include <string>
+#include <vector>
+class Book;    // forward declaration
+class Library; // forward declaration
 
 #include "lms_project.hpp"
 
 int lastColForThis(WINDOW *, std::string);
 int lastRowInWin(WINDOW *);
 int maxSizeInVector(vString);
-void addBookToLibrary(WINDOW *, WINDOW *, Library &);
+int midColInWin(WINDOW *);
+int midRowInWin(WINDOW *);
+void addBookToLibrary(WINDOW *, WINDOW *, WINDOW *, Library &);
 void buildAuthor(WINDOW *, Book &, char buff[512]);
 void buildBook(WINDOW *, Book &);
 void buildISBN(WINDOW *, Book &, char buff[512]);
@@ -72,19 +78,24 @@ void buildTitle(WINDOW *, Book &, char buff[512]);
 void clrRow(WINDOW *aWindow, unsigned);
 void displayBook(WINDOW *aWin, Book &aBook, int r = 5, int tPos = 1,
                  int aPos = 23, int iPos = 45);
-void displyBookVector(WINDOW *, vBook &);
-void displayCatalog(WINDOW *, Library &);
-void displayHelp(WINDOW *);
+void displyBookVector(WINDOW *, WINDOW *, vBook &);
+void displayCatalog(WINDOW *, WINDOW *, Library &);
+void displayCurrentPage(WINDOW *, WINDOW *, vBook, int, int, int, int);
+void displayHelp(WINDOW *, WINDOW *);
 void displayMenu(WINDOW *);
+void displayPaginationMessage(WINDOW *, int, int, int);
 void displayTextAtCenter(WINDOW *, std::string &, int);
 void displayWelcome(WINDOW *);
+void paginate(const vBook &, vvBook &, int);
 void prompt(WINDOW *, const std::string, std::string &);
-void removeBookFromLibrary(WINDOW *, WINDOW *, Library &);
-void searchUsingAuthor(WINDOW *, WINDOW *, Library &);
-void searchUsingISBN(WINDOW *, WINDOW *, Library &);
-void searchUsingTitle(WINDOW *, WINDOW *, Library &);
-void tag(WINDOW *, std::string);
-void tuiLoop(WINDOW *, WINDOW *, Library &);
+void removeBookFromLibrary(WINDOW *, WINDOW *, WINDOW *, Library &);
+void resetMessageArea(WINDOW *);
+void resetWorkArea(WINDOW *);
+void searchUsingAuthor(WINDOW *, WINDOW *, WINDOW *, Library &);
+void searchUsingISBN(WINDOW *, WINDOW *, WINDOW *, Library &);
+void searchUsingTitle(WINDOW *, WINDOW *, WINDOW *, Library &);
+void tag(WINDOW *, std::string, int r = 1);
+void tuiLoop(WINDOW *, WINDOW *, WINDOW *, Library &);
 
 /* main
    gets: usual cli parameters which are ignored
@@ -97,30 +108,63 @@ int main(int argc, char *argv[]) {
   refresh();
   cbreak();
   noecho();
+  erase();
 
   int screenWidth, screenHeight;
   getmaxyx(stdscr, screenHeight, screenWidth);
 
-  const int IWIN_HEIGHT(screenHeight / 9); // input window height must be > 1 
+  const int IWIN_HEIGHT(screenHeight / 9 - 1);
   const int IWIN_WIDTH(screenWidth - screenWidth / 5);
-  WINDOW *iWin(newwin(IWIN_HEIGHT, IWIN_WIDTH, screenHeight - IWIN_HEIGHT, screenWidth / 10));
 
-  init_pair(1, COLOR_CYAN, COLOR_BLACK);
-  attron(COLOR_PAIR(1)); // Enable the color pair
-  wbkgd(iWin, COLOR_PAIR(1));
+  const int MWIN_HEIGHT(5);
+  const int MWIN_WIDTH(IWIN_WIDTH);
 
-  WINDOW *oWin(newwin(screenHeight - IWIN_HEIGHT, screenWidth, 0, 0));
+  const int OWIN_HEIGHT(screenHeight - MWIN_HEIGHT - IWIN_HEIGHT);
+  const int OWIN_WIDTH(screenWidth - screenWidth / 11);
 
-  box(iWin, 0, 0);
+  WINDOW *iWin(newwin(IWIN_HEIGHT, IWIN_WIDTH, screenHeight - IWIN_HEIGHT,
+                      screenWidth / 10)); // input window
+  WINDOW *mWin(newwin(MWIN_HEIGHT, MWIN_WIDTH,
+                      screenHeight - IWIN_HEIGHT - IWIN_HEIGHT,
+                      screenWidth / 10)); // message window
+  WINDOW *oWin(
+      newwin(OWIN_HEIGHT, OWIN_WIDTH, 0, screenWidth / 22)); // output window
+
+  if (has_colors()) {
+    // Enable color functionality
+    start_color();
+
+    // Define color pairs
+    init_pair(1, COLOR_CYAN, COLOR_BLACK);
+    init_pair(2, COLOR_RED, COLOR_BLACK);
+    init_pair(3, COLOR_GREEN, COLOR_BLACK);
+
+    wbkgd(iWin, COLOR_PAIR(1));
+    wbkgd(oWin, COLOR_PAIR(1));
+    wbkgd(mWin, COLOR_PAIR(3));
+
+    // Apply color pair to text
+    // attron(COLOR_PAIR(1));
+    // printw("Hello, ncurses with color!");
+    // attroff(COLOR_PAIR(1));
+
+    refresh();
+    // getch();
+  }
+
+  wclear(iWin);
+  wclear(oWin);
+  wclear(mWin);
 
   refresh();
   wrefresh(iWin);
   wrefresh(oWin);
+  wrefresh(mWin);
 
   Library dLibrary;
   dLibrary.deserialize();
 
-  tuiLoop(iWin, oWin, dLibrary);
+  tuiLoop(iWin, oWin, mWin, dLibrary);
 
   dLibrary.serialize();
 
@@ -133,66 +177,83 @@ int main(int argc, char *argv[]) {
 /* tuiLoop
 
  */
-void tuiLoop(WINDOW *iWin, WINDOW *oWin, Library &dLibrary) {
-  displayWelcome(oWin);
-  wprintw(iWin, "Helllo!!!");
-  wrefresh(iWin);
+void tuiLoop(WINDOW *iWin, WINDOW *oWin, WINDOW *mWin, Library &dLibrary) {
   char ch(' ');
+  displayWelcome(oWin);
   do {
-    werase(iWin);
+    resetMessageArea(mWin);
+    resetWorkArea(iWin);
     wrefresh(oWin);
     curs_set(0);
     move(0, 0);
     ch = wgetch(iWin);
-    // curs_set(0);
-    // wrefresh(iWin);
     if (ch != ERR) {
+      werase(mWin);
+      werase(iWin);
       if (ch == 'a') {
-        addBookToLibrary(iWin, oWin, dLibrary);
+        addBookToLibrary(iWin, oWin, mWin, dLibrary);
       } else if (ch == 'c') {
-        displayCatalog(oWin, dLibrary);
+        displayCatalog(oWin, mWin, dLibrary);
       } else if (ch == 'i') {
-        searchUsingISBN(iWin, oWin, dLibrary);
+        searchUsingISBN(iWin, oWin, mWin, dLibrary);
       } else if (ch == 'r') {
-        removeBookFromLibrary(iWin, oWin, dLibrary);
+        removeBookFromLibrary(iWin, oWin, mWin, dLibrary);
       } else if (ch == 't') {
-        searchUsingTitle(iWin, oWin, dLibrary);
+        searchUsingTitle(iWin, oWin, mWin, dLibrary);
       } else if (ch == 's') {
-        searchUsingAuthor(iWin, oWin, dLibrary);
+        searchUsingAuthor(iWin, oWin, mWin, dLibrary);
       } else if (ch == 'x') {
         break;
       } else if (ch == 'h') {
-        displayHelp(oWin);
+        displayHelp(oWin, mWin);
       } else {
-        displayHelp(oWin);
+        displayHelp(oWin, mWin);
       }
     }
   } while (true);
 }
 
-void addBookToLibrary(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
+void addBookToLibrary(WINDOW *iWin, WINDOW *oWin, WINDOW *mWin,
+                      Library &aLibrary) {
   Book aBook;
   buildBook(iWin, aBook);
   aLibrary.addBook(aBook);
-  werase(oWin);
-  displayBook(oWin, aBook, lastRowInWin(oWin));
-  tag(oWin, "ADDED");
+  werase(iWin);
+  displayBook(mWin, aBook, midRowInWin(mWin), 3);
+  tag(mWin, "ADDED", midRowInWin(mWin));
+  werase(iWin);
+  resetWorkArea(iWin);
+  resetMessageArea(mWin);
 }
 
-void removeBookFromLibrary(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
+void removeBookFromLibrary(WINDOW *iWin, WINDOW *oWin, WINDOW *mWin,
+                           Library &aLibrary) {
   Book aBook;
   char buff[512];
   buildISBN(iWin, aBook, buff);
   werase(oWin);
-  displayBook(oWin, aBook, lastRowInWin(oWin));
-  if (aLibrary.removeBook(aBook)) {
-    tag(oWin, "REMOVED");
-  } else {
-    tag(oWin, "NOT FOUND");
+  werase(iWin);
+  std::string tmp = aBook.getISBN();
+  vBook results;
+  aLibrary.searchByISBN(tmp, results);
+  if (results.empty()) {
+    mvwprintw(mWin, midRowInWin(mWin), 2,
+              "Book with ISBN of %s not in catalog.", aBook.getISBN().c_str());
+  } else if (aLibrary.removeBook(aBook)) {
+    displayBook(mWin, results.front(), midRowInWin(mWin));
+    tag(mWin, "REMOVED", midRowInWin(mWin));
+    // } else {
+    //   displayBook(mWin, aBook, midRowInWin(mWin));
+    //   attroff(COLOR_PAIR(1));
+    //   attron(COLOR_PAIR(2)); // Enable the color pair
+    //   // tag(mWin, "NOT FOUND", midRowInWin(mWin));
+    //   attroff(COLOR_PAIR(2)); // disable the color pair
   }
+  wrefresh(mWin);
 }
 
-void searchUsingISBN(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
+void searchUsingISBN(WINDOW *iWin, WINDOW *oWin, WINDOW *mWin,
+                     Library &aLibrary) {
   Book aBook;
   char buff[512];
   buildISBN(iWin, aBook, buff);
@@ -202,13 +263,14 @@ void searchUsingISBN(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
   werase(oWin);
   if (results.empty()) {
     displayBook(oWin, aBook, lastRowInWin(oWin));
-    tag(oWin, "NOT FOUND");
+    tag(mWin, "NOT FOUND", midRowInWin(mWin));
   } else {
-    displayBook(oWin, results.front(), lastRowInWin(oWin));
+    displyBookVector(oWin, mWin, results);
   }
 }
 
-void searchUsingTitle(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
+void searchUsingTitle(WINDOW *iWin, WINDOW *oWin, WINDOW *mWin,
+                      Library &aLibrary) {
   Book aBook;
   char buff[512];
   buildTitle(iWin, aBook, buff);
@@ -218,21 +280,24 @@ void searchUsingTitle(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
   werase(oWin);
   if (results.empty()) {
     displayBook(oWin, aBook, lastRowInWin(oWin));
-    tag(oWin, "NOT FOUND");
+    tag(mWin, "NOT FOUND", midRowInWin(mWin));
   } else {
     displayBook(oWin, results.front(), lastRowInWin(oWin));
   }
 }
 
-void searchUsingAuthor(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
+void searchUsingAuthor(WINDOW *iWin, WINDOW *oWin, WINDOW *mWin,
+                       Library &aLibrary) {
   char buff[512];
   Book aBook;
   buildAuthor(iWin, aBook, buff);
   std::string tmp = aBook.getAuthor();
   vBook results;
   aLibrary.searchByAuthor(tmp, results);
+  werase(iWin);
+  werase(mWin);
   if (results.empty()) {
-    mvwprintw(oWin, lastRowInWin(oWin), 5, "No books written by %s found.",
+    mvwprintw(iWin, midRowInWin(iWin), 5, "No books written by %s found.",
               aBook.getAuthor().c_str());
   } else {
     std::sort(results.begin(), results.end(),
@@ -242,71 +307,77 @@ void searchUsingAuthor(WINDOW *iWin, WINDOW *oWin, Library &aLibrary) {
     werase(oWin);
     std::string s0("Books by " + results.front().getAuthor() + ":");
     displayTextAtCenter(oWin, s0, 1);
-    displyBookVector(oWin, results);
+    displyBookVector(oWin, mWin, results);
   }
 }
 
 void buildTitle(WINDOW *iWin, Book &aBook, char buff[512]) {
-  werase(iWin);
   mvwprintw(iWin, 1, 3, "title: ");
-  // wrefresh(iWin);
+  resetWorkArea(iWin);
   echo();
   curs_set(1);
+  wmove(iWin, 1, 10);
   wgetstr(iWin, buff);
   noecho();
   curs_set(0);
   aBook.setTitle(buff);
-  werase(iWin);
-  displayBook(iWin, aBook, 2);
-  wrefresh(iWin);
+  displayBook(iWin, aBook, midRowInWin(iWin), 3);
+  resetWorkArea(iWin);
 }
 
 void buildAuthor(WINDOW *iWin, Book &aBook, char buff[512]) {
-  werase(iWin);
   mvwprintw(iWin, 1, 2, "author: ");
-  // wrefresh(iWin);
+  wmove(iWin, 1, 10);
+  wclrtoeol(iWin);
+  resetWorkArea(iWin);
   echo();
   curs_set(1);
+  wmove(iWin, 1, 10);
   wgetstr(iWin, buff);
   noecho();
   curs_set(0);
   aBook.setAuthor(buff);
-  werase(iWin);
-  displayBook(iWin, aBook, 2);
-  wrefresh(iWin);
+  displayBook(iWin, aBook, midRowInWin(iWin), 3);
+  resetWorkArea(iWin);
 }
 
 void buildISBN(WINDOW *iWin, Book &aBook, char buff[512]) {
-  werase(iWin);
+  wmove(iWin, 1, 1);
+  wclrtoeol(iWin);
   mvwprintw(iWin, 1, 4, "ISBN: ");
-  // wrefresh(iWin);
+  resetWorkArea(iWin);
   echo();
   curs_set(1);
+  wmove(iWin, 1, 10);
   wgetstr(iWin, buff);
   noecho();
   curs_set(0);
   aBook.setISBN(buff);
-  werase(iWin);
-  displayBook(iWin, aBook, 2);
-  wrefresh(iWin);
+  displayBook(iWin, aBook, midRowInWin(iWin), 3);
+  resetWorkArea(iWin);
 }
 
 void buildBook(WINDOW *iWin, Book &aBook) {
   char buff[512];
+  wclear(iWin);
+  resetWorkArea(iWin);
   buildTitle(iWin, aBook, buff);
   buildAuthor(iWin, aBook, buff);
   buildISBN(iWin, aBook, buff);
 }
 
-void displayHelp(WINDOW *oWin) {
+void displayHelp(WINDOW *aWin, WINDOW *bWin) {
   std::string h0("Help Screen");
   std::string h1("Choose one of the availible options from the above menu. ");
   std::string h2("e.g. 'c' will display the catalog, 'a' to add a book, etc.");
-  werase(oWin);
-  displayTextAtCenter(oWin, h0, 1);
-  displayMenu(oWin);
-  displayTextAtCenter(oWin, h1, lastRowInWin(oWin) - 1);
-  displayTextAtCenter(oWin, h2, lastRowInWin(oWin));
+  std::string h3("To quit the program, press the 'x' key.");
+  werase(aWin);
+  werase(bWin);
+  displayTextAtCenter(aWin, h0, 1);
+  displayMenu(aWin);
+  displayTextAtCenter(bWin, h1, 1);
+  displayTextAtCenter(bWin, h2, 2);
+  displayTextAtCenter(bWin, h3, 3);
 }
 
 /*
@@ -355,9 +426,9 @@ void displayBook(WINDOW *aWin, Book &b, int r, int tPos, int aPos, int iPos) {
   mvwprintw(aWin, r, iPos, b.getISBN().c_str());
 }
 
-void displayCatalog(WINDOW *aWin, Library &aLibrary) {
+void displayCatalog(WINDOW *aWin, WINDOW *mWin, Library &aLibrary) {
   int r(1);
-  wclear(aWin);
+  werase(aWin);
   wrefresh(aWin);
   std::string t0("Your Catalog:");
   displayTextAtCenter(aWin, t0, r);
@@ -367,7 +438,7 @@ void displayCatalog(WINDOW *aWin, Library &aLibrary) {
   for (auto aPair : dcatalog) {
     results.emplace_back(aPair.second);
   }
-  displyBookVector(aWin, results);
+  displyBookVector(aWin, mWin, results);
 }
 
 void displayWelcome(WINDOW *aWin) {
@@ -411,7 +482,7 @@ void displayMenu(WINDOW *aWin) {
 int lastRowInWin(WINDOW *aWin) {
   int maxRows, maxCols;
   getmaxyx(aWin, maxRows, maxCols);
-  return maxRows - 1;
+  return maxRows;
 }
 
 /* maxSizeInVector
@@ -436,7 +507,7 @@ int maxSizeInVector(vString sv) {
 int lastColForThis(WINDOW *aWin, std::string str) {
   int maxRows, maxCols;
   getmaxyx(aWin, maxRows, maxCols);
-  return maxCols - str.size();
+  return maxCols - str.size() - 1;
 }
 
 /* tag
@@ -444,8 +515,8 @@ int lastColForThis(WINDOW *aWin, std::string str) {
    returns: nothing
    objective: put the string on the far right side of the bottom row.
  */
-void tag(WINDOW *aWin, std::string str) {
-  mvwprintw(aWin, lastRowInWin(aWin), lastColForThis(aWin, str), str.c_str());
+void tag(WINDOW *aWin, std::string str, int r) {
+  mvwprintw(aWin, r, lastColForThis(aWin, str), str.c_str());
 }
 
 /* displyBookVector
@@ -456,20 +527,105 @@ void tag(WINDOW *aWin, std::string str) {
    method: locates the center, displays the header, traverses the vector
    displaying title, author, and ISBN using the displayBook function.
 */
-void displyBookVector(WINDOW *aWin, vBook &books) {
-  int maxRows, maxCols, r(3);
-  Book aBook;
-  getmaxyx(aWin, maxRows, maxCols);
+void displyBookVector(WINDOW *oWin, WINDOW *mWin, vBook &books) {
+  int maxRows, maxCols;
+  getmaxyx(oWin, maxRows, maxCols);
   int cen((maxCols >> 1) - 6);
-  int lef(cen - 33), rig(cen + 49);
+  int lef(cen - 33);
   lef = lef < 0 ? 0 : lef;
+  int rig(cen + 49);
   rig = rig + 11 > maxCols ? maxCols - 11 : rig;
+  const int maxLn(maxRows - 5);
+  vvBook pages;
+  paginate(books, pages, maxLn);
+  int cpn(0); // current page number - 1 (pages index)
+  displayCurrentPage(oWin, mWin, pages[cpn], lef, cen, rig, cpn);
+  displayPaginationMessage(mWin, cpn, pages.size(), books.size());
+  if (pages.size() > 1) {
+    char ch('j');
+    while (true) {
+      ch = getch();
+      if (ch == 'x') {
+        break;
+      } else if (ch == 'h') { // first page
+        cpn = 0;
+        displayCurrentPage(oWin, mWin, pages[cpn], lef, cen, rig, cpn);
+      } else if (ch == 'l') { // last page
+        cpn = pages.size() - 1;
+        displayCurrentPage(oWin, mWin, pages[cpn], lef, cen, rig, cpn);
+      } else if (ch == 'k' && cpn > 0) { // prev page
+        cpn--;
+        displayCurrentPage(oWin, mWin, pages[cpn], lef, cen, rig, cpn);
+      } else if (ch == 'j' && cpn < pages.size() - 1) { // next page
+        cpn++;
+        displayCurrentPage(oWin, mWin, pages[cpn], lef, cen, rig, cpn);
+      }
+      displayPaginationMessage(mWin, cpn, pages.size(), books.size());
+    }
+  }
+  werase(oWin);
+  werase(mWin);
+  displayMenu(oWin);
+}
+
+void displayPaginationMessage(WINDOW *mWin, int cpn, int pc, int bc) {
+  char tmp[255];
+  snprintf(tmp, 200, "Displaying page %d of %d (%d books).", cpn + 1, pc, bc);
+  std::string h0(tmp);
+  std::string h1("Press 'j' for next page, 'k' for previous, 'h' for first, "
+                 "'l' for last.");
+  displayTextAtCenter(mWin, h0, 1);
+  displayTextAtCenter(mWin, h1, 3);
+  resetMessageArea(mWin);
+}
+
+void displayHeader(WINDOW *oWin, WINDOW *mWin, int lef, int cen, int rig,
+                   int cpn) {
+  Book aBook;
   aBook.clear();
   aBook.setAuthor("Author");
   aBook.setTitle("Title");
   aBook.setISBN("ISBN");
-  displayBook(aWin, aBook, r++, lef, cen, rig);
-  for (auto aBook : books) {
-    displayBook(aWin, aBook, r++, lef, cen, rig);
+  displayBook(oWin, aBook, 3, lef, cen, rig);
+  mvwprintw(oWin, 3, rig + 6, "Page %d", cpn + 1);
+}
+
+void paginate(const vBook &books, vvBook &pages, int maxLn) {
+  pages.clear();
+  vBook t0;
+  pages.emplace_back(t0);
+  for (auto b : books) {
+    if (pages.back().size() > maxLn) {
+      vBook tn;
+      pages.emplace_back(tn);
+    }
+    pages.back().emplace_back(b);
   }
 }
+
+void displayCurrentPage(WINDOW *oWin, WINDOW *mWin, vBook books, int lef,
+                        int cen, int rig, int cpn) {
+  werase(oWin);
+  displayHeader(oWin, mWin, lef, cen, rig, cpn);
+  int r(5);
+  for (auto aBook : books) {
+    displayBook(oWin, aBook, r++, lef, cen, rig);
+  }
+  wrefresh(oWin);
+}
+
+void resetWorkArea(WINDOW *aWin) {
+  box(aWin, 0, 0);
+  mvwprintw(aWin, 0, midColInWin(aWin) - 4, "Work Area");
+  wrefresh(aWin);
+}
+
+void resetMessageArea(WINDOW *aWin) {
+  box(aWin, 0, 0);
+  mvwprintw(aWin, 0, midColInWin(aWin) - 6, "Message Area");
+  wrefresh(aWin);
+}
+
+int midRowInWin(WINDOW *aWin) { return getmaxy(aWin) >> 1; }
+
+int midColInWin(WINDOW *aWin) { return getmaxx(aWin) >> 1; }

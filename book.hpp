@@ -43,7 +43,6 @@ private:
   std::string author;
   std::string isbn;
 };
-typedef std::vector<Book> vBook;
 
 namespace std {
 template <> struct hash<Book> {
