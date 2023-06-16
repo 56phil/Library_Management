@@ -1,6 +1,4 @@
 
-Sure! Here's a sample README file for your Library Management System (LMS) project:
-
 # Library Management System (LMS)
 
 The Library Management System (LMS) is a console application built using C++. It provides a user-friendly interface for managing books in a library. Users can perform various operations such as adding books, removing books, searching for books by title or author, displaying all books in the library, and more.
@@ -39,6 +37,8 @@ To run the Library Management System, follow these steps:
 The following software is required to run the Library Management System:
 
 - C++ compiler (e.g., GCC, Clang)
+- ncurses package
+- boost pacakge 
 
 ## Project Structure
 

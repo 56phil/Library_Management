@@ -39,12 +39,11 @@ void Library::searchByAuthor(std::string &author, std::vector<Book> &results) {
 
 void Library::searchByISBN(std::string &isbn, std::vector<Book> &results) {
   results.clear();
-  auto it =
-      books.find(isbn); // Find the element in the unordered_map
-  if (it != books.end()) {
-    results.emplace_back(it->second); 
+  for (auto aPair : books) {
+    if (aPair.second.getISBN() == isbn) {
+      results.emplace_back(aPair.second);
+    }
   }
-
 }
 
 void Library::searchByTitle(std::string &title, std::vector<Book> &results) {
@@ -52,7 +51,7 @@ void Library::searchByTitle(std::string &title, std::vector<Book> &results) {
   for (auto aPair : books) {
     if (aPair.second.getTitle() == title) {
       results.emplace_back(aPair.second);
-      break;
+      // break;
     }
   }
 }

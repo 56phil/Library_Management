@@ -9,6 +9,7 @@ class Book; // foward reference
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/unordered_map.hpp>
+#include <cstdio>
 #include <cstdlib>
 #include <curses.h>
 #include <fstream>
