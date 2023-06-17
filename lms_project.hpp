@@ -15,8 +15,8 @@ class Book; // foward reference
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <iostream>
 #include <ncurses.h>
+#include <signal.h>
 #include <sstream>
 #include <string>
 #include <sys/ioctl.h>
