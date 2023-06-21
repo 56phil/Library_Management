@@ -56,6 +56,7 @@ instructions on how to run your program.
 
 #include "book.hpp"
 #include "library.hpp"
+#include <cstdio>
 #include <iostream>
 #include <ncurses.h>
 class Book;    // forward declaration
@@ -205,10 +206,14 @@ void handleResize(int signal) {
     resizeterm(screenHeight, screenWidth);
 
     if (screenHeight < 24 || screenWidth < 112) {
-      displayStringAtCenter(oWin, "HELP!", midRowInWin(oWin));
+      displayStringAtCenter(oWin, "HELP!", midRowInWin(oWin) - 1);
       displayStringAtCenter(
           oWin, "I need at least 24 rows x 112 cols to operate correctly.",
-          midRowInWin(oWin) + 1);
+          midRowInWin(oWin));
+      char buff[512];
+      snprintf(buff, 256, "Now, I have %d rows x %d cols", screenHeight,
+               screenWidth);
+      displayStringAtCenter(oWin, buff, midRowInWin(oWin) + 1);
       refresh();
       int ch = getch();
     }
@@ -223,10 +228,8 @@ void handleResize(int signal) {
     mvwin(iWin, oShare + iShare, 0);
 
     clearScreen();
-    resetScreen();
-    refresh();
 
-    displayStringAtCenter(iWin, jokes.front(), 2); // forces reset
+    displayStringAtCenter(iWin, jokes.front(), 2);
     resetIWin();
   }
 }
@@ -244,9 +247,10 @@ void tuiLoop(Library &dLibrary) {
     displayMenu();
     wrefresh(oWin);
     ch = getch();
-    wbkgd(mWin, COLOR_PAIR(3));
     werase(mWin);
+    resetMWin();
     werase(iWin);
+    resetIWin();
     if (ch == ERR) {
     } else if (ch == KEY_RESIZE) {
       handleResize(ch);
@@ -275,9 +279,9 @@ void tuiLoop(Library &dLibrary) {
 }
 
 void clearScreen() {
-  wclear(oWin);
-  wclear(mWin);
-  wclear(iWin);
+  werase(oWin);
+  werase(mWin);
+  werase(iWin);
   resetScreen();
 }
 
@@ -824,19 +828,27 @@ int midRowInWin(WINDOW *aWin) { return getmaxy(aWin) >> 1; }
 int midColInWin(WINDOW *aWin) { return getmaxx(aWin) >> 1; }
 
 void displayWindowSizes() {
-  int screenWidth, screenHeight;
-  clearScreen();
-  getmaxyx(oWin, screenHeight, screenWidth);
-  int xPos((screenWidth >> 1) - 8);
-  mvwprintw(oWin, screenHeight >> 1, xPos, "ROWS: %d COLS: %d", screenHeight,
-            screenWidth);
-  getmaxyx(mWin, screenHeight, screenWidth);
-  mvwprintw(mWin, screenHeight >> 1, xPos, "ROWS: %d COLS: %d", screenHeight,
-            screenWidth);
-  getmaxyx(iWin, screenHeight, screenWidth);
-  mvwprintw(iWin, screenHeight >> 1, xPos, "ROWS: %d COLS: %d", screenHeight,
-            screenWidth);
-  resetScreen();
+  int sW, sH;
+  werase(oWin);
+  werase(mWin);
+  werase(iWin);
+  getmaxyx(oWin, sH, sW);
+  int xPos((sW >> 1) - 8);
+  mvwprintw(oWin, sH >> 1, xPos, "ROWS: %d COLS: %d", sH, sW);
+  getmaxyx(mWin, sH, sW);
+  mvwprintw(mWin, sH >> 1, xPos, "ROWS: %d COLS: %d", sH, sW);
+  getmaxyx(iWin, sH, sW);
+  mvwprintw(iWin, sH >> 1, xPos, "ROWS: %d COLS: %d", sH, sW);
+  resetIWin();
+  resetMWin();
+  resetOWin();
+  getch();
+  werase(oWin);
+  werase(mWin);
+  werase(iWin);
+  resetIWin();
+  resetMWin();
+  resetOWin();
 }
 
 void resizeWhileInCatalog(vBook &books, vvBook &pages, int &cpn, int ch) {
